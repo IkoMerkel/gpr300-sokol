@@ -7,6 +7,7 @@
 #include "ew/model.h"
 #include "ew/shader.h"
 #include "ew/texture.h"
+#include "batteries/lights.h"
 
 class Scene final : public batteries::Scene
 {
@@ -21,4 +22,6 @@ class Scene final : public batteries::Scene
   private:
     std::unique_ptr<ew::Model> suzanne;
     std::unique_ptr<ew::Shader> blinnphong;
+
+    batteries::light_t light;
 };
