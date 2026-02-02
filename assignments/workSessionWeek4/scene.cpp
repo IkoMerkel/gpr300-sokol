@@ -21,9 +21,9 @@ struct {
 
 Scene::Scene()
 {
-    suzanne = std::make_unique<ew::Model>("assets/models/suzanne.obj");
-    blinnphong = std::make_unique<ew::Shader>("assets/shaders/default.vs", "assets/shaders/blinnphong.fs");
-    //textuxe = std::make_unique<ew::Texture>("assets/textures/tileColor.png", )
+    suzanne = std::make_unique<ew::Model>("assets/models/skull.obj");
+    toon = std::make_unique<ew::Shader>("assets/shaders/default.vs", "assets/shaders/toon.fs");
+    //textuxe = std::make_unique<ew::Texture>("")
 
     light = {
         .brightness = 1.0f,
@@ -61,19 +61,19 @@ void Scene::Render(void)
     //glBindTexture(GL_TEXTURE_2D,textuxe->getID());
     
 
-    blinnphong->use();
+    toon->use();
 
     // scene matrices
-    //blinnphong->setInt("texture0",index);
-    blinnphong->setMat4("model", glm::mat4(1.0f));
-    blinnphong->setMat4("view_proj", view_proj);
-    blinnphong->setVec3("camera_position", camera.position);
-    blinnphong->setVec3("light.pos", light.position);
-    blinnphong->setVec3("light.color", light.color);
-    blinnphong->setFloat("material.shiny", debug.alpha);
-    blinnphong->setFloat("material.diffuse", debug.diffuse);
-    blinnphong->setFloat("material.specular", debug.specular);
-    blinnphong->setFloat("material.ambient", debug.ambient);
+    //toon->setInt("texture0",index);
+    toon->setMat4("model", glm::mat4(1.0f));
+    toon->setMat4("view_proj", view_proj);
+    toon->setVec3("camera_position", camera.position);
+    toon->setVec3("light.pos", light.position);
+    toon->setVec3("light.color", light.color);
+    toon->setFloat("material.shiny", debug.alpha);
+    toon->setFloat("material.diffuse", debug.diffuse);
+    toon->setFloat("material.specular", debug.specular);
+    toon->setFloat("material.ambient", debug.ambient);
 
     // draw suzanne
     suzanne->draw();

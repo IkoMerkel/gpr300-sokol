@@ -9,13 +9,6 @@ struct Light{
   vec3 color;
 };
 
-struct Material{
-  float ambient;
-  float diffuse;
-  float specular;
-  float shiny;
-};
-
 // varyings
 in vec3 vs_position;
 in vec3 vs_normal;
@@ -26,7 +19,7 @@ uniform Material material;
 uniform Light light;
 //uniform texture texture0;
 
-vec3 blinnphong(vec3 normal, vec3 frag_position, vec3 light_position) {
+vec3 toon(vec3 normal, vec3 frag_position, vec3 light_position) {
   vec3 view_dir = normalize(camera - frag_position);
   vec3 light_dir = normalize(light_position - frag_position);
   vec3 reflect_dir = reflect(light_dir, vs_normal);
@@ -44,7 +37,7 @@ vec3 blinnphong(vec3 normal, vec3 frag_position, vec3 light_position) {
 
 void main()
 {
-  vec3 lighting = blinnphong(vs_normal, vs_position,light.pos);
+  vec3 lighting = toon(vs_normal, vs_position,light.pos);
   vec3 object_color = vs_normal.rgb * 0.5f + 0.5f;
   //object_color = texture stuff (for when we build out the architecture for texturing)
   vec3 final_color = object_color * lighting;
