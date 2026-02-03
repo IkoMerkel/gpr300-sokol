@@ -23,7 +23,7 @@ Scene::Scene()
 {
     suzanne = std::make_unique<ew::Model>("assets/models/suzanne.obj");
     blinnphong = std::make_unique<ew::Shader>("assets/shaders/default.vs", "assets/shaders/blinnphong.fs");
-    //textuxe = std::make_unique<ew::Texture>("assets/textures/tileColor.png", )
+    texture = std::make_unique<ew::Texture>("assets/textures/tileColor.png");
 
     light = {
         .brightness = 1.0f,
@@ -58,13 +58,13 @@ void Scene::Render(void)
     // glDisable(GL_DEPTH_TEST);
 
     glActiveTexture(GL_TEXTURE0);
-    //glBindTexture(GL_TEXTURE_2D,textuxe->getID());
+    glBindTexture(GL_TEXTURE_2D,texture->getID());
     
 
     blinnphong->use();
 
     // scene matrices
-    //blinnphong->setInt("texture0",index);
+    blinnphong->setInt("texture0",0);
     blinnphong->setMat4("model", glm::mat4(1.0f));
     blinnphong->setMat4("view_proj", view_proj);
     blinnphong->setVec3("camera_position", camera.position);

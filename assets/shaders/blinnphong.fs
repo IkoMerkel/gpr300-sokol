@@ -22,6 +22,7 @@ in vec3 vs_normal;
 in vec2 vs_texcoord;
 
 uniform vec3 camera;
+uniform sampler2D texture0;
 uniform Material material;
 uniform Light light;
 //uniform texture texture0;
@@ -45,8 +46,7 @@ vec3 blinnphong(vec3 normal, vec3 frag_position, vec3 light_position) {
 void main()
 {
   vec3 lighting = blinnphong(vs_normal, vs_position,light.pos);
-  vec3 object_color = vs_normal.rgb * 0.5f + 0.5f;
-  //object_color = texture stuff (for when we build out the architecture for texturing)
+  vec3 object_color = texture(texture0,vs_texcoord).rgb;
   vec3 final_color = object_color * lighting;
   FragColor = vec4(final_color, 1.0);
 }

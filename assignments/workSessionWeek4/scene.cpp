@@ -21,15 +21,40 @@ struct {
 
 Scene::Scene()
 {
-    suzanne = std::make_unique<ew::Model>("assets/models/skull.obj");
+    suzanne = std::make_unique<ew::Model>("assets/models/suzanne.obj");
     toon = std::make_unique<ew::Shader>("assets/shaders/default.vs", "assets/shaders/toon.fs");
-    //textuxe = std::make_unique<ew::Texture>("")
+    texture = std::make_unique<ew::Texture>("assets/textures/ZAtoon.png");
 
     light = {
         .brightness = 1.0f,
         .color = {1.0f,1.0f,1.0f},
         .position = {2.0f, 2.0f, 2.0f},
     };
+
+    palette = {
+        .color1 =glm::vec3(1.0f,0.0f,0.0f),
+        .color2 = glm::vec3(0.0f,0.0f,1.0f),
+    };
+
+    glCreateFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    {
+    glGenTextures(1, &fbo_texture);
+    glBindTexture(GL_TEXTURE_2D, fbo_texture);
+    //advance opengl framebuffers
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 800, 600, 0, GL_RGB, GL_UNSIGNED_BYTE,NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    }
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,fbo_texture,0);
+    
+
+    
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    {
+        printf("framebuffer not complete");
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 Scene::~Scene()
@@ -47,6 +72,7 @@ auto matrix = glm::mat4(1.0f);
 
 void Scene::Render(void)
 {
+    //glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     const auto view_proj = camera.Projection() * camera.View();
 
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
@@ -58,13 +84,12 @@ void Scene::Render(void)
     // glDisable(GL_DEPTH_TEST);
 
     glActiveTexture(GL_TEXTURE0);
-    //glBindTexture(GL_TEXTURE_2D,textuxe->getID());
-    
+    glBindTexture(GL_TEXTURE_2D,texture->getID());
 
     toon->use();
 
     // scene matrices
-    //toon->setInt("texture0",index);
+    toon->setInt("texture0",0);
     toon->setMat4("model", glm::mat4(1.0f));
     toon->setMat4("view_proj", view_proj);
     toon->setVec3("camera_position", camera.position);
@@ -77,6 +102,7 @@ void Scene::Render(void)
 
     // draw suzanne
     suzanne->draw();
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Scene::Debug(void)
@@ -116,6 +142,15 @@ void Scene::Debug(void)
     ImGui::DragFloat("Diffuse", &debug.diffuse, 0.01f, 0.0f,1.0f);
     ImGui::DragFloat("Specular", &debug.specular, 0.01f, 0.0f,1.0f);
     ImGui::DragFloat("Shiny", &debug.alpha, 1.0f, 1.0f,128.0f);
+    ImGui::SeparatorText("Palette");
+    ImGui::ColorEdit3("Color1",&palette.color1[0]);
+    ImGui::ColorEdit3("Color2",&palette.color2[0]);
+
+    ImGui::Image(
+        (void*)(intptr_t) fbo_texture,
+        ImVec2(400,300),
+        ImVec2(0,1), ImVec2(1,0)
+    );
 
     /* build debug ui here */
 

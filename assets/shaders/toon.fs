@@ -9,15 +9,20 @@ struct Light{
   vec3 color;
 };
 
+struct Palette{
+  vec3 color1;
+  vec3 color2;
+};
+
 // varyings
 in vec3 vs_position;
 in vec3 vs_normal;
 in vec2 vs_texcoord;
 
 uniform vec3 camera;
-uniform Material material;
 uniform Light light;
-//uniform texture texture0;
+uniform sampler2D texture0;
+uniform Palette pal;
 
 vec3 toon(vec3 normal, vec3 frag_position, vec3 light_position) {
   vec3 view_dir = normalize(camera - frag_position);
@@ -25,20 +30,25 @@ vec3 toon(vec3 normal, vec3 frag_position, vec3 light_position) {
   vec3 reflect_dir = reflect(light_dir, vs_normal);
   vec3 half_dir = normalize(light_dir + view_dir); 
 
-  float NdotL = max(dot(normal, light_dir), 0.0f);
+  float NdotL = dot(normal, light_dir) + 1.0f * 0.5f;
   float NdotH = max(dot(normal, half_dir), 0.0f);
   float PdotL = dot(vs_position, light_position.xyz);
 
-  float diffuse = NdotL * material.diffuse;
-  float specular = pow(NdotH, material.shiny) * material.specular;
+ // vec3 gradient = texture(texture0,vs_texcoord).rgb;  
+  vec3 gradient = texture(texture0,vec2(NdotL,NdotH)).rgb;  
+  //vec3 gradient = vec3(0.0f);
+  vec3 light_color = mix(pal.color1,pal.color2,gradient);
+
+  float diffuse = NdotL;
+  float specular = pow(NdotH,0.5f);
   float lighting = diffuse + specular;
-  return (lighting * light.color) + vec3(material.ambient);
+  return light_color;
 }
 
 void main()
 {
   vec3 lighting = toon(vs_normal, vs_position,light.pos);
-  vec3 object_color = vs_normal.rgb * 0.5f + 0.5f;
+  vec3 object_color = vec3(1.0f);
   //object_color = texture stuff (for when we build out the architecture for texturing)
   vec3 final_color = object_color * lighting;
   FragColor = vec4(final_color, 1.0);
