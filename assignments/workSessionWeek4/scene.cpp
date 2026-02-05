@@ -24,6 +24,7 @@ Scene::Scene()
     suzanne = std::make_unique<ew::Model>("assets/models/suzanne.obj");
     toon = std::make_unique<ew::Shader>("assets/shaders/default.vs", "assets/shaders/toon.fs");
     texture = std::make_unique<ew::Texture>("assets/textures/ZAtoon.png");
+    texturePlad = std::make_unique<ew::Texture>("assets/textures/PladColor.png");
 
     light = {
         .brightness = 1.0f,
@@ -72,12 +73,14 @@ auto matrix = glm::mat4(1.0f);
 
 void Scene::Render(void)
 {
-    //glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    
     const auto view_proj = camera.Projection() * camera.View();
 
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glEnable(GL_DEPTH_TEST);
@@ -86,12 +89,16 @@ void Scene::Render(void)
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D,texture->getID());
 
+    
     toon->use();
 
     // scene matrices
     toon->setInt("texture0",0);
+    toon->setInt("texture1",1);
     toon->setMat4("model", glm::mat4(1.0f));
     toon->setMat4("view_proj", view_proj);
+    toon->setVec3("pal.color1", palette.color1);
+    toon->setVec3("pal.color2",palette.color2);
     toon->setVec3("camera_position", camera.position);
     toon->setVec3("light.pos", light.position);
     toon->setVec3("light.color", light.color);

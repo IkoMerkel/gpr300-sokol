@@ -22,6 +22,7 @@ in vec2 vs_texcoord;
 uniform vec3 camera;
 uniform Light light;
 uniform sampler2D texture0;
+uniform sampler2D texture1;
 uniform Palette pal;
 
 vec3 toon(vec3 normal, vec3 frag_position, vec3 light_position) {
@@ -34,9 +35,7 @@ vec3 toon(vec3 normal, vec3 frag_position, vec3 light_position) {
   float NdotH = max(dot(normal, half_dir), 0.0f);
   float PdotL = dot(vs_position, light_position.xyz);
 
- // vec3 gradient = texture(texture0,vs_texcoord).rgb;  
   vec3 gradient = texture(texture0,vec2(NdotL,NdotH)).rgb;  
-  //vec3 gradient = vec3(0.0f);
   vec3 light_color = mix(pal.color1,pal.color2,gradient);
 
   float diffuse = NdotL;
