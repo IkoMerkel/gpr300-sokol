@@ -43,7 +43,7 @@ vec3 toon(vec3 normal, vec3 frag_position, vec3 light_position) {
   float NdotH = pow(max(dot(normal, half_dir), 0.0f), material.shiny);
   float PdotL = dot(vs_position, light_position.xyz);
 
-  vec3 gradient = texture(texture0,vec2(NdotL,NdotL)).rgb;  
+  vec3 gradient = texture(texture0,vec2(NdotL,NdotH)).rgb;  
   vec3 light_color = mix(pal.color1,pal.color2,gradient);
 
   float diffuse = NdotL;
@@ -56,7 +56,6 @@ void main()
 {
   vec3 lighting = toon(vs_normal, vs_position,light.pos);
   vec3 object_color = vec3(1.0f);
-  //object_color = texture stuff (for when we build out the architecture for texturing)
   vec3 final_color = object_color * lighting;
   FragColor = vec4(final_color, 1.0);
 }

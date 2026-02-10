@@ -25,6 +25,8 @@ class Scene final : public batteries::Scene
     std::unique_ptr<ew::Texture> texture;
     std::unique_ptr<ew::Texture> texturePlad;
 
+    std::unique_ptr<ew::Shader> postProcess;
+
     batteries::light_t light;
 
     struct 
@@ -36,4 +38,5 @@ class Scene final : public batteries::Scene
 
     unsigned int fbo;
     unsigned int fbo_texture;
+    unsigned int fbo_depth;
 };
