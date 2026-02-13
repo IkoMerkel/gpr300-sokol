@@ -53,7 +53,8 @@ struct {
     float diffuse = 0.5f;
     float specular = 0.5f;
     float ambient = 0.5f;
-    float strength = 16.0f;
+    float slot1 = 16.0f;
+    float slot2 = 0.25f;
 } debug;
 
 Scene::Scene()
@@ -117,9 +118,25 @@ void Scene::Update(float dt)
 }
 
 auto matrix = glm::mat4(1.0f);
+static const char* shaderMenu[]{"blur","grayscale","vignette"};
+static int selectedMenu = 0;
 
 void Scene::Render(void)
 {
+    switch (selectedMenu)
+    {
+    case 0:
+        postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/blur.fs");
+        break;
+    case 1:
+        postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/grayscale.fs");
+        break;
+    case 2:
+        postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/vignette.fs");
+        break;
+    default:
+        break;
+    }
     const auto view_proj = camera.Projection() * camera.View();
 
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -158,7 +175,23 @@ void Scene::Render(void)
 
     postProcess->use();
     postProcess->setInt("screen",0);
-    postProcess->setFloat("strength", debug.strength);
+    switch (selectedMenu)
+    {
+    case 0:
+        postProcess->setFloat("strength", debug.slot1);
+        break;
+    case 1:
+        
+        break;
+    case 2:
+        postProcess->setFloat("intensity", debug.slot1);
+        postProcess->setFloat("extent", debug.slot2);
+        break;
+    default:
+        break;
+    }
+
+    
 
     glDisable(GL_DEPTH_TEST);
 
@@ -203,15 +236,30 @@ void Scene::Debug(void)
 
     ImGui::Checkbox("Paused", &time.paused);
     ImGui::SliderFloat("Time Factor", &time.factor, 0.0f, 10.0f);
-    ImGui::ColorEdit3("Light Color", &light.color[0]);
+    /*ImGui::ColorEdit3("Light Color", &light.color[0]);
     ImGui::DragFloat("Ambient", &debug.ambient, 0.01f, 0.0f,1.0f);
     ImGui::DragFloat("Diffuse", &debug.diffuse, 0.01f, 0.0f,1.0f);
     ImGui::DragFloat("Specular", &debug.specular, 0.01f, 0.0f,1.0f);
-    ImGui::DragFloat("Shiny", &debug.alpha, 1.0f, 1.0f,128.0f);
+    ImGui::DragFloat("Shiny", &debug.alpha, 1.0f, 1.0f,128.0f);*/
     ImGui::SeparatorText("Palette");
     ImGui::ColorEdit3("Color1",&palette.color1[0]);
     ImGui::ColorEdit3("Color2",&palette.color2[0]);
-    ImGui::SliderFloat("Kernal Blur", &debug.strength, 10.0f, 300.0f);
+    switch (selectedMenu)
+    {
+    case 0:
+        ImGui::SliderFloat("Kernal Blur", &debug.slot1, 10.0f, 300.0f);
+        break;
+    case 1:
+        
+        break;
+    case 2:
+        ImGui::SliderFloat("intensity", &debug.slot1, 10.0, 60.0f);
+        ImGui::SliderFloat("extent", &debug.slot2, 0.1f, 0.8f);
+        break;
+    default:
+        break;
+    }
+    ImGui::Combo("Current Shader", &selectedMenu, shaderMenu, IM_ARRAYSIZE(shaderMenu));
 
     ImGui::Image(
         (void*)(intptr_t) fbo_texture,

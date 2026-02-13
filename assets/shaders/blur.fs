@@ -40,8 +40,6 @@ void main()
     vec3 local = vec3(texture(screen,vs_texcoord.xy + offsets[i]));
     final_color += local * (kernal[i]/strength); 
   }
-
-  //float gray = 0.2126 * final_color.r + 0.7152 * final_color.g + 0.0722 * final_color.b;
   
   FragColor = vec4(final_color, 1.0);
 }
