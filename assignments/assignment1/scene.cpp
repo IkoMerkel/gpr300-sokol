@@ -55,6 +55,8 @@ struct {
     float ambient = 0.5f;
     float slot1 = 16.0f;
     float slot2 = 0.25f;
+    float slot3 = 0.0f;
+    glm::vec3 slotV3 = glm::vec3(0.01f,0.0f,-0.01f);
 } debug;
 
 Scene::Scene()
@@ -118,7 +120,7 @@ void Scene::Update(float dt)
 }
 
 auto matrix = glm::mat4(1.0f);
-static const char* shaderMenu[]{"blur","grayscale","vignette"};
+static const char* shaderMenu[]{"blur","grayscale","vignette","film grain","chromatic aberration", "lens distortion"};
 static int selectedMenu = 0;
 
 void Scene::Render(void)
@@ -133,6 +135,15 @@ void Scene::Render(void)
         break;
     case 2:
         postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/vignette.fs");
+        break;
+    case 3:
+        postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/filmGrain.fs");
+        break;
+    case 4:
+        postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/chromeabs.fs");
+        break;
+    case 5:
+        postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/lensdistort.fs");
         break;
     default:
         break;
@@ -154,6 +165,7 @@ void Scene::Render(void)
         toon->use();
 
         // scene matrices
+        toon->setFloat("time", (float)time.absolute);
         toon->setInt("texture0",0);
         toon->setInt("texture1",1);
         toon->setMat4("model", glm::mat4(1.0f));
@@ -186,6 +198,15 @@ void Scene::Render(void)
     case 2:
         postProcess->setFloat("intensity", debug.slot1);
         postProcess->setFloat("extent", debug.slot2);
+        break;
+    case 3:
+        postProcess->setFloat("strength", debug.slot3);
+        break;
+    case 4:
+        postProcess->setVec3("offset", debug.slotV3);
+        break;
+    case 5:
+        postProcess->setFloat("strength", debug.slot3);
         break;
     default:
         break;
@@ -255,6 +276,17 @@ void Scene::Debug(void)
     case 2:
         ImGui::SliderFloat("intensity", &debug.slot1, 10.0, 60.0f);
         ImGui::SliderFloat("extent", &debug.slot2, 0.1f, 0.8f);
+        break;
+    case 3:
+        ImGui::SliderFloat("strength", &debug.slot3, 0.0f, 1.0f);
+        break;
+    case 4:
+        ImGui::SliderFloat("red offset", &debug.slotV3.x, -0.02f, 0.02f);
+        ImGui::SliderFloat("green offset", &debug.slotV3.y, -0.02f, 0.02f);
+        ImGui::SliderFloat("blue offset", &debug.slotV3.z, -0.02f, 0.02f);
+        break;
+    case 5:
+        ImGui::SliderFloat("strength", &debug.slot3, 0.0f, 1.0f);
         break;
     default:
         break;
