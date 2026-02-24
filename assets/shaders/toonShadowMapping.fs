@@ -25,12 +25,23 @@ struct Material{
 in vec3 vs_position;
 in vec3 vs_normal;
 in vec2 vs_texcoord;
+in vec4 vs_light_view_proj_pos;
 
 uniform vec3 camera;
 uniform Light light;
 uniform sampler2D texture0;
-uniform sampler2D shadow_map;uniform Palette pal;
+uniform sampler2D shadow_map;
+uniform Palette pal;
 uniform Material material;
+
+float shadowCalc(vec4 frag_pos_light_space)
+{
+  vec3 proj_coords = frag_pos_light_space.xyz / frag_pos_light_space.w;
+  float closet = texture(shadow, proj_coords.xy);
+  float current = proj_coords.z;
+  float shadow 0.0f;
+  return shadow;
+}
 
 vec3 toon(vec3 normal, vec3 frag_position, vec3 light_position) {
   vec3 view_dir = normalize(camera - frag_position);
@@ -53,7 +64,9 @@ vec3 toon(vec3 normal, vec3 frag_position, vec3 light_position) {
 
 void main()
 {
+  float shadow = shadowCalc(vs_light_view_proj_pos);
   vec3 lighting = toon(vs_normal, vs_position,light.pos);
+  lighting *= (1.0f - shadow);
   vec3 object_color = vec3(1.0f);
   vec3 final_color = object_color * lighting;
   FragColor = vec4(final_color, 1.0);

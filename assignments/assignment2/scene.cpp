@@ -10,6 +10,7 @@
 
 // batteries
 #include "batteries/opengl.h"
+#include "ew/procGen.h"
 
 struct FullScreenQuad
 {
@@ -63,6 +64,8 @@ Scene::Scene()
 {
     suzanne = std::make_unique<ew::Model>("assets/models/suzanne.obj");
     toon = std::make_unique<ew::Shader>("assets/shaders/default.vs", "assets/shaders/toon.fs");
+    toonShadowMapping = std::make_unique<ew::Shader>("assets/shaders/defaultshadowmap.vs", "assets/shaders/toonShadowMapping.fs");
+    depth = std::make_unique<ew::Shader>("assets/shaders/depth.vs", "assets/shaders/depth.fs");
     postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/blur.fs");
     texture = std::make_unique<ew::Texture>("assets/textures/ZAtoon.png");
     //texturePlad = std::make_unique<ew::Texture>("assets/textures/PladColor.png");
@@ -78,38 +81,78 @@ Scene::Scene()
         .color2 = glm::vec3(0.0f,1.0f,1.0f),
     };
 
+    plane.load(ew::createPlane(10, 10, 20));
     fullscreen_quad.Initialize();
 
+    Scene::CreateFrameBuffer();
+    Scene::CreateDepthBuffer();
+    
+}
 
-    glCreateFramebuffers(1, &fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+Scene::~Scene()
+{
+    glDeleteFramebuffers(1, &shadow_fbo);
+    glDeleteFramebuffers(0, &fbo);
+}
+
+void Scene::CreateFrameBuffer()
+{
+        //framebuffer
+        glCreateFramebuffers(1, &fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        {
+            glGenTextures(1, &fbo_texture);
+            glBindTexture(GL_TEXTURE_2D, fbo_texture);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 800, 600, 0, GL_RGB, GL_UNSIGNED_BYTE,NULL);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,fbo_texture,0);
+    
+            glGenTextures(1, &fbo_depth);
+            glBindTexture(GL_TEXTURE_2D, fbo_depth);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, 800, 600, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,NULL);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_TEXTURE_2D,fbo_depth,0);
+    
+            glBindTexture(GL_TEXTURE_2D, 0);
+    
+            if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+            {
+                printf("framebuffer not complete");
+            }
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Scene::CreateDepthBuffer()
+{
+    glCreateFramebuffers(1, &shadow_fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, shadow_fbo);
     {
-        glGenTextures(1, &fbo_texture);
-        glBindTexture(GL_TEXTURE_2D, fbo_texture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 800, 600, 0, GL_RGB, GL_UNSIGNED_BYTE,NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,fbo_texture,0);
 
-        glGenTextures(1, &fbo_depth);
-        glBindTexture(GL_TEXTURE_2D, fbo_depth);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, 800, 600, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_TEXTURE_2D,fbo_depth,0);
+        glGenTextures(1, &shadow_depth);
+        glBindTexture(GL_TEXTURE_2D, shadow_depth);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT16, 800, 600, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT,NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,shadow_depth,0);
+
+        glDrawBuffers(0,nullptr);
+        glReadBuffer(GL_NONE);
+
+        //glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_TEXTURE_2D,shadow_depth,0);
 
         glBindTexture(GL_TEXTURE_2D, 0);
 
         if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         {
-            printf("framebuffer not complete");
+            printf("depthbuffer not complete");
         }
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-Scene::~Scene()
-{
 }
 
 void Scene::Update(float dt)
@@ -156,6 +199,29 @@ void Scene::Render(void)
     }
     const auto view_proj = camera.Projection() * camera.View();
 
+    glBindFramebuffer(GL_FRAMEBUFFER,shadow_fbo);
+    {
+        const auto light_proj = glm::ortho(-10.0f, 10.0f, -10.0f,10.0f, 0.1f, 100.0f);
+        const auto light_view = glm::lookAt(light.position,glm::vec3(0.0f),glm::vec3(0.0f,-1.0f,0.0f));
+        const auto light_view_proj = light_proj * light_view;
+        
+
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glEnable(GL_DEPTH_TEST);
+        glViewport(0,0, 800, 600);
+
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+        depth->use();
+
+        depth->setMat4("model", glm::mat4(1.0f));
+        depth->setMat4("light_view_proj", light_view_proj);
+
+        suzanne->draw();
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     {
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
@@ -167,13 +233,16 @@ void Scene::Render(void)
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D,texture->getID());
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D,shadow_depth);
         
         toon->use();
 
         // scene matrices
         toon->setFloat("time", (float)time.absolute);
         toon->setInt("texture0",0);
-        toon->setInt("texture1",1);
+        toon->setInt("shadow_map",1);
         toon->setMat4("model", glm::mat4(1.0f));
         toon->setMat4("view_proj", view_proj);
         toon->setVec3("pal.color1", palette.color1);
@@ -188,8 +257,14 @@ void Scene::Render(void)
 
         // draw suzanne
         suzanne->draw();
+
+        const auto planeMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f,-2.0f,0.0f));
+        toon->setMat4("model", planeMatrix);
+        plane.draw();
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+    
 
     postProcess->use();
     postProcess->setInt("screen",0);
@@ -307,6 +382,12 @@ void Scene::Debug(void)
 
     ImGui::Image(
         (void*)(intptr_t) fbo_depth,
+        ImVec2(400,300),
+        ImVec2(0,1), ImVec2(1,0)
+    );
+
+    ImGui::Image(
+        (void*)(intptr_t) shadow_depth,
         ImVec2(400,300),
         ImVec2(0,1), ImVec2(1,0)
     );
