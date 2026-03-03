@@ -8,7 +8,7 @@ layout(location = 2) in vec2 in_texcoord;
 // uniforms
 uniform mat4 view_proj;
 uniform mat4 model;
-uniform vec4 light_view_proj;
+uniform mat4 light_view_proj;
 
 // varyings
 out vec3 vs_position;
@@ -18,9 +18,9 @@ out vec4 vs_light_view_proj_pos;
 
 void main()
 {
-  vs_position = vec3(model * vec4(in_position * 1,0f));
+  vs_position = vec3(model * vec4(in_position,1.0));
   vs_normal = transpose(inverse(mat3(model))) * in_normal;
   vs_texcoord = in_texcoord;
-  vs_light_view_proj_pos = light_view_proj * vec4(in_position * 1,0f);
-  gl_Position = view_proj * model * vec4(in_position, 1.0);
+  vs_light_view_proj_pos = light_view_proj * vec4(vs_position,1.0);
+  gl_Position = view_proj * vec4(vs_position, 1.0);
 }

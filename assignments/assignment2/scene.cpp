@@ -199,11 +199,57 @@ void Scene::Render(void)
     }
     const auto view_proj = camera.Projection() * camera.View();
 
+    const auto light_proj = glm::ortho(-10.0f, 10.0f, -10.0f,10.0f, 0.1f, 100.0f);
+    const auto light_view = glm::lookAt(light.position,glm::vec3(0.0f),glm::vec3(0.0f,1.0f,0.0f));
+    const auto light_view_proj = light_proj * light_view;
+
+    
+
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    {
+        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
+
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glEnable(GL_DEPTH_TEST);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D,texture->getID());
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D,shadow_depth);
+        
+        toonShadowMapping->use();
+
+        // scene matrices
+        toonShadowMapping->setFloat("time", (float)time.absolute);
+        toonShadowMapping->setInt("texture0",0);
+        toonShadowMapping->setInt("shadow_map",1);
+        toonShadowMapping->setMat4("model", glm::mat4(1.0f));
+        toonShadowMapping->setMat4("view_proj", view_proj);
+        toonShadowMapping->setMat4("light_view_proj", light_view_proj);
+        toonShadowMapping->setVec3("pal.color1", palette.color1);
+        toonShadowMapping->setVec3("pal.color2",palette.color2);
+        toonShadowMapping->setVec3("camera_position", camera.position);
+        toonShadowMapping->setVec3("light.pos", light.position);
+        toonShadowMapping->setVec3("light.color", light.color);
+        toonShadowMapping->setFloat("material.shiny", debug.alpha);
+        toonShadowMapping->setFloat("material.diffuse", debug.diffuse);
+        //toonShadowMapping->setFloat("material.specular", debug.specular);
+        toonShadowMapping->setFloat("material.ambient", debug.ambient);
+        
+        // draw suzanne
+        suzanne->draw();
+
+        const auto planeMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f,-1.0f,0.0f));
+        toonShadowMapping->setMat4("model", planeMatrix);
+        plane.draw();
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
     glBindFramebuffer(GL_FRAMEBUFFER,shadow_fbo);
     {
-        const auto light_proj = glm::ortho(-10.0f, 10.0f, -10.0f,10.0f, 0.1f, 100.0f);
-        const auto light_view = glm::lookAt(light.position,glm::vec3(0.0f),glm::vec3(0.0f,-1.0f,0.0f));
-        const auto light_view_proj = light_proj * light_view;
         
 
         glEnable(GL_CULL_FACE);
@@ -221,50 +267,6 @@ void Scene::Render(void)
         suzanne->draw();
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    {
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
-
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_BACK);
-        glEnable(GL_DEPTH_TEST);
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D,texture->getID());
-
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D,shadow_depth);
-        
-        toon->use();
-
-        // scene matrices
-        toon->setFloat("time", (float)time.absolute);
-        toon->setInt("texture0",0);
-        toon->setInt("shadow_map",1);
-        toon->setMat4("model", glm::mat4(1.0f));
-        toon->setMat4("view_proj", view_proj);
-        toon->setVec3("pal.color1", palette.color1);
-        toon->setVec3("pal.color2",palette.color2);
-        toon->setVec3("camera_position", camera.position);
-        toon->setVec3("light.pos", light.position);
-        toon->setVec3("light.color", light.color);
-        toon->setFloat("material.shiny", debug.alpha);
-        toon->setFloat("material.diffuse", debug.diffuse);
-        toon->setFloat("material.specular", debug.specular);
-        toon->setFloat("material.ambient", debug.ambient);
-
-        // draw suzanne
-        suzanne->draw();
-
-        const auto planeMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f,-2.0f,0.0f));
-        toon->setMat4("model", planeMatrix);
-        plane.draw();
-    }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    
-    
 
     postProcess->use();
     postProcess->setInt("screen",0);

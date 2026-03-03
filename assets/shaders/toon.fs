@@ -39,15 +39,15 @@ vec3 toon(vec3 normal, vec3 frag_position, vec3 light_position) {
   vec3 half_dir = normalize(light_dir + view_dir); 
 
   float NdotL = (dot(normal, light_dir) + 1.0f) * 0.5f;
-  float NdotH = pow(max(dot(normal, half_dir), 0.0f), material.shiny);
+  //float NdotH = pow(max(dot(normal, half_dir), 0.0f), material.shiny);
   float PdotL = dot(vs_position, light_position.xyz);
 
-  vec3 gradient = texture(texture0,vec2(NdotL,NdotH)).rgb;  
+  vec3 gradient = texture(texture0,vec2(NdotL,NdotL)).rgb;  
   vec3 light_color = mix(pal.color1,pal.color2,gradient);
 
-  float diffuse = NdotL;
-  float specular = pow(NdotH,0.5f);
-  float lighting = diffuse + specular;
+  //float diffuse = NdotL;
+  //float specular = pow(NdotH,0.5f);
+  //float lighting = diffuse + specular;
   return light_color;
 }
 
