@@ -36,11 +36,22 @@ uniform Material material;
 
 float shadowCalc(vec4 frag_pos_light_space)
 {
+  float bias = max(0.05 * (1.0 - dot(vs_normal,normalize(light.pos - vs_position))),0.005);
   vec3 proj_coords = frag_pos_light_space.xyz / frag_pos_light_space.w;
   proj_coords = proj_coords * 0.5 + 0.5;
   float closest = texture(shadow_map, proj_coords.xy).r;
   float current = proj_coords.z;
-  float shadow = current > closest ? 1.0 : 0.0;
+  float shadow = 0.0;
+  vec2 texelSize = 1.0/textureSize(shadow_map,0);
+  for(int i = -1; i <= 1; ++i)
+  {
+    for(int j = -1; j <= 1; ++j)
+    {
+      float pcfDepth = texture(shadow_map,proj_coords.xy + vec2(i,j) * texelSize).r;
+      shadow += current - bias > pcfDepth ? 1.0 : 0.0;
+    }
+  }
+  shadow /= 9.0;
   return shadow;
 }
 

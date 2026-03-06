@@ -81,7 +81,7 @@ Scene::Scene()
         .color2 = glm::vec3(0.0f,1.0f,1.0f),
     };
 
-    plane.load(ew::createPlane(10, 10, 20));
+    plane.load(ew::createPlane(50, 50, 20));
     fullscreen_quad.Initialize();
 
     Scene::CreateFrameBuffer();
@@ -139,6 +139,7 @@ void Scene::CreateDepthBuffer()
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,shadow_depth,0);
+        glBindFramebuffer(GL_FRAMEBUFFER, shadow_fbo);
 
         glDrawBuffers(0,nullptr);
         glReadBuffer(GL_NONE);
@@ -226,7 +227,9 @@ void Scene::Render(void)
         toonShadowMapping->setFloat("time", (float)time.absolute);
         toonShadowMapping->setInt("texture0",0);
         toonShadowMapping->setInt("shadow_map",1);
+        glCullFace(GL_FRONT);
         toonShadowMapping->setMat4("model", glm::mat4(1.0f));
+        glCullFace(GL_BACK);
         toonShadowMapping->setMat4("view_proj", view_proj);
         toonShadowMapping->setMat4("light_view_proj", light_view_proj);
         toonShadowMapping->setVec3("pal.color1", palette.color1);
