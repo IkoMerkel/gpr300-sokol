@@ -1,350 +1,417 @@
 #include "scene.h"
 
-// imgui
-#include "imgui/imgui.h"
-#include "imguizmo/imguizmo.h"
-
-// glm
-#include "glm/glm.hpp"
-#include "glm/gtc/type_ptr.hpp"
-
 // batteries
+#include "batteries/math.h"
 #include "batteries/opengl.h"
 
-struct FullScreenQuad
+// ew
+#include "ew/procGen.h"
+
+// imgui
+#include "imgui/imgui.h"
+
+constexpr int kFramebufferWidth = 800;
+constexpr int kFramebufferHeight = 600;
+
+constexpr float orbit_radius = 2.0f;
+constexpr glm::vec4 light_orbit_radius = {2.0f, 4.0f, -4.0f, 1.0f};
+
+struct FullscreenQuad
 {
-    unsigned int vao;
-    unsigned int vbo;
+    GLuint vao;
+    GLuint vbo;
 
-
-    void Initialize(){
-        float vertices[] = 
-        {
-            //pos (x,y) texcoords (u,v)
-            -1.0f, 1.0f, 0.0f, 1.0f,
+    void Initialize()
+    {
+        // clang-format off
+        float quad_vertices[] = {
+            // pos (x, y) texcoord (u, v)
+            -1.0f,  1.0f, 0.0f, 1.0f,
             -1.0f, -1.0f, 0.0f, 0.0f,
             1.0f, -1.0f, 1.0f, 0.0f,
 
-            -1.0f, 1.0f, 0.0f, 1.0f,
+            -1.0f,  1.0f, 0.0f, 1.0f,
             1.0f, -1.0f, 1.0f, 0.0f,
-            1.0f, 1.0f, 1.0f, 1.0f
+            1.0f,  1.0f, 1.0f, 1.0f,
         };
+        // clang-format on
+
+        // initialize fullscreen quad, buffer object
         glGenVertexArrays(1, &vao);
         glGenBuffers(1, &vbo);
 
+        // bind vao, and vbo
         glBindVertexArray(vao);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
-        glBufferData(GL_ARRAY_BUFFER,sizeof(vertices),&vertices, GL_STATIC_DRAW);
+        // buffer data to vbo
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertices), &quad_vertices, GL_STATIC_DRAW);
 
+        // positions and texcoords
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE, 4 * sizeof(float), (void*)0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE, 4 * sizeof(float), (void*)(sizeof(float) * 2));
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(sizeof(float) * 2));
 
         glBindVertexArray(0);
     }
-
-    
 } fullscreen_quad;
 
-struct {
-    float alpha = 128.0f;
+struct Framebuffer
+{
+    GLuint fbo;
+    GLuint position;
+    GLuint normal;
+    GLuint albedo;
+    GLuint material;
+    GLuint depth;
+
+    void Initialize()
+    {
+        // initialize framebuffer
+        glGenFramebuffers(1, &fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+        // position attachment
+        glGenTextures(1, &position);
+        glBindTexture(GL_TEXTURE_2D,position);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kFramebufferWidth, kFramebufferHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE,NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,position,0);
+        // normal attachment
+        glGenTextures(1, &normal);
+        glBindTexture(GL_TEXTURE_2D,normal);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kFramebufferWidth, kFramebufferHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE,NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,normal,0);
+        // albedo attachment
+        glGenTextures(1, &albedo);
+        glBindTexture(GL_TEXTURE_2D,albedo);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kFramebufferWidth, kFramebufferHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE,NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT2,GL_TEXTURE_2D,albedo,0);
+        // albedo attachment
+        glGenTextures(1, &material);
+        glBindTexture(GL_TEXTURE_2D,material);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kFramebufferWidth, kFramebufferHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE,NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT3,GL_TEXTURE_2D,material,0);
+        // depth attachment
+        glGenTextures(1, &depth);
+        glBindTexture(GL_TEXTURE_2D,depth);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, kFramebufferWidth, kFramebufferHeight, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_TEXTURE_2D,depth,0);
+
+        GLenum array[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+        glDrawBuffers(4, array);
+
+        // check completeness
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        {
+            printf("Not so victorious\n");
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+} framebuffer;
+
+struct LighVolumebuffer
+{
+    GLuint fbo;
+    GLuint color;
+    GLuint depth;
+
+    void Initialize()
+    {
+        // initialize framebuffer
+        glGenFramebuffers(1, &fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        // position attachment
+        glGenTextures(1, &color);
+        glBindTexture(GL_TEXTURE_2D,color);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kFramebufferWidth, kFramebufferHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE,NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,color,0);
+        // depth attachment
+        glGenTextures(1, &depth);
+        glBindTexture(GL_TEXTURE_2D,depth);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, kFramebufferWidth, kFramebufferHeight, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_TEXTURE_2D,depth,0);
+
+        // check completeness
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        {
+            printf("Not so victorious\n");
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+} lightvolumebuffer;
+
+struct Material
+{
+    float ambient = 1.0f;
     float diffuse = 0.5f;
     float specular = 0.5f;
-    float ambient = 0.5f;
-    float slot1 = 16.0f;
-    float slot2 = 0.25f;
-    float slot3 = 0.0f;
-    glm::vec3 slotV3 = glm::vec3(0.01f,0.0f,-0.01f);
+    float shininess = 0.5f;
+} material;
 
-    int width = 10;
-    int spacing = 3;
-} debug;
-
-void Scene::CacheInstanceData()
+struct
 {
-    auto size = (debug.width * (debug.width) - 1) * (debug.width * (debug.width) - 1);
-    modelInstance.resize(size);
-
-
-    auto i =0;
-        for(auto x = -debug.width; x <= debug.width; x++)
-        {
-            for(auto y = -debug.width; y <= debug.width; y++, i++)
-            {
-
-                auto position = glm::vec3(x * debug.spacing, 0, y*debug.spacing );
-                auto matrix = glm::translate(glm::mat4(1.0f),position);
-
-                modelInstance[i] = matrix;
-            }
-        }
-}
+    int width = 2;
+    float light_radius = 2.5f;
+    bool draw_light_volume = false;
+} debug;
 
 Scene::Scene()
 {
+    suzanne = std::make_unique<ew::Model>("assets/models/suzanne.obj");
+    geometry = std::make_unique<ew::Shader>("assets/shaders/deferred/geometry.vs", "assets/shaders/deferred/geometry.fs");
+    blinnphong = std::make_unique<ew::Shader>("assets/shaders/deferred/blinnphong.vs", "assets/shaders/deferred/blinnphong.fs");
+    noprocess = std::make_unique<ew::Shader>("assets/shaders/deferred/default.vs", "assets/shaders/deferred/default.fs");
+    lightsphere = std::make_unique<ew::Shader>("assets/shaders/deferred/light.vs", "assets/shaders/deferred/light.fs");
     
-    suzanne = std::make_unique<ew::Model>("assets/models/suzanne.obj", true);
-    toon = std::make_unique<ew::Shader>("assets/shaders/default_instance.vs", "assets/shaders/toon.fs");
-    postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/blur.fs");
-    texture = std::make_unique<ew::Texture>("assets/textures/ZAtoon.png");
-    //texturePlad = std::make_unique<ew::Texture>("assets/textures/PladColor.png");
+    texture = std::make_unique<ew::Texture>("assets/textures/tileColor.png");
 
-    light = {
-        .brightness = 1.0f,
-        .color = {1.0f,1.0f,1.0f},
-        .position = {2.0f, 2.0f, 2.0f},
+    sphere.load(ew::createSphere(1.0f, 8));
+
+    ambient = {
+        .intensity = 1.0f,
+        .color = {0.5f, 0.5f, 0.5f},
     };
 
-    palette = {
-        .color1 =glm::vec3(0.2f,0.0f,0.0f),
-        .color2 = glm::vec3(0.0f,1.0f,1.0f),
-    };
-
+    framebuffer.Initialize();
+    lightvolumebuffer.Initialize();
     fullscreen_quad.Initialize();
 
-
-    glCreateFramebuffers(1, &fbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    {
-        glGenTextures(1, &fbo_texture);
-        glBindTexture(GL_TEXTURE_2D, fbo_texture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 800, 600, 0, GL_RGB, GL_UNSIGNED_BYTE,NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,fbo_texture,0);
-
-        glGenTextures(1, &fbo_depth);
-        glBindTexture(GL_TEXTURE_2D, fbo_depth);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, 800, 600, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,NULL);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_STENCIL_ATTACHMENT,GL_TEXTURE_2D,fbo_depth,0);
-
-        glBindTexture(GL_TEXTURE_2D, 0);
-
-        if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        {
-            printf("framebuffer not complete");
-        }
-    }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    CacheInstanceData();
-
-    glGenBuffers(1, &instnace_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, instnace_buffer);
-    glBufferData(GL_ARRAY_BUFFER, 100 * sizeof(glm::mat4),&modelInstance[0],GL_STREAM_DRAW);
+    InitializeInstanceData();
 }
-
 
 Scene::~Scene()
 {
 }
 
+void Scene::InitializeInstanceData(void)
+{
+    auto width = debug.width;
+    auto size = (width - (-width) + 1) * (width - (-width) + 1);
+    model_instances.resize(size);
+    light_instances.resize(size);
+
+    auto i = 0;
+    for (auto x = -debug.width; x <= debug.width; x++)
+    {
+        for (auto y = -debug.width; y <= debug.width; y++, i++)
+        {
+            const auto position = glm::vec3(x * 3.0f, 0, y * 3.0f);
+            const auto orbit = batteries::random_point_on_sphere();
+
+            // light instances
+            light_instances[i] = {
+                .color = batteries::random_color(),
+                .position = glm::vec4(position, 1.0f) + orbit  * orbit_radius,
+            };
+
+            // model instances
+            model_instances[i] = batteries::random_model_matrix(position);
+        }
+    }
+}
+
 void Scene::Update(float dt)
 {
     batteries::Scene::Update(dt);
-
-    /* body */
 }
-
-auto matrix = glm::mat4(1.0f);
-static const char* shaderMenu[]{"blur","grayscale","vignette","film grain","chromatic aberration", "lens distortion", "inverse", "line detection"};
-static int selectedMenu = 0;
 
 void Scene::Render(void)
 {
-    switch (selectedMenu)
-    {
-    case 0:
-        postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/blur.fs");
-        break;
-    case 1:
-        postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/grayscale.fs");
-        break;
-    case 2:
-        postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/vignette.fs");
-        break;
-    case 3:
-        postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/filmGrain.fs");
-        break;
-    case 4:
-        postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/chromeabs.fs");
-        break;
-    case 5:
-        postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/lensdistort.fs");
-        break;
-    case 6:
-        postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/inverse.fs");
-        break;
-    case 7:
-        postProcess = std::make_unique<ew::Shader>("assets/shaders/fullscreen.vs", "assets/shaders/linedetect.fs");
-        break;
-    default:
-        break;
-    }
     const auto view_proj = camera.Projection() * camera.View();
 
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    // render gbuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
     {
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
-
+        glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
-        glEnable(GL_DEPTH_TEST);
 
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D,texture->getID());
+        glClearColor(0.0f,0.0f,0.0f,0.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        geometry->use();
+        geometry->setMat4("view_proj", view_proj);
+        geometry->setMat4("material.ambient", material.ambient);
+        geometry->setMat4("material.diffuse", material.diffuse);
+        geometry->setMat4("material.specular", material.specular);
+        geometry->setMat4("material.shininess", material.shininess);
+
+        auto i = 0;
+        for (auto x = -debug.width; x <= debug.width; x++)
+        {
+            for (auto y = -debug.width; y <= debug.width; y++, i++)
+            {
+                geometry->setMat4("model", model_instances[i]);
+
+                suzanne->draw();
+            }
+        }
         
-        toon->use();
-
-        // scene matrices
-        toon->setFloat("time", (float)time.absolute);
-        toon->setInt("texture0",0);
-        toon->setInt("texture1",1);
-        toon->setMat4("model", glm::mat4(1.0f));
-        toon->setMat4("view_proj", view_proj);
-        toon->setVec3("pal.color1", palette.color1);
-        toon->setVec3("pal.color2",palette.color2);
-        toon->setVec3("camera_position", camera.position);
-        toon->setVec3("light.pos", light.position);
-        toon->setVec3("light.color", light.color);
-        toon->setFloat("material.shiny", debug.alpha);
-        toon->setFloat("material.diffuse", debug.diffuse);
-        toon->setFloat("material.specular", debug.specular);
-        toon->setFloat("material.ambient", debug.ambient);
-
-        suzanne->draw(100);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    postProcess->use();
-    postProcess->setInt("screen",0);
-    switch (selectedMenu)
+    // render volume lights
+    glBindFramebuffer(GL_FRAMEBUFFER, lightvolumebuffer.fbo);
     {
-    case 0:
-        postProcess->setFloat("strength", debug.slot1);
-        break;
-    case 1:
-        
-        break;
-    case 2:
-        postProcess->setFloat("intensity", debug.slot1);
-        postProcess->setFloat("extent", debug.slot2);
-        break;
-    case 3:
-        postProcess->setFloat("strength", debug.slot3);
-        break;
-    case 4:
-        postProcess->setVec3("offset", debug.slotV3);
-        break;
-    case 5:
-        postProcess->setFloat("strength", debug.slot3);
-        break;
-    default:
-        break;
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_ONE, GL_ONE);
+        glBlendEquation(GL_FUNC_ADD);
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+
+        glClearColor(0.0f,0.0f,0.0f,0.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, framebuffer.position);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, framebuffer.normal);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, framebuffer.albedo);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, framebuffer.material);
+
+        blinnphong->use();
+
+        blinnphong->setMat4("view_proj", view_proj);
+
+        blinnphong->setVec3("camera", camera.position);
+
+        blinnphong->setInt("g_position",0);
+        blinnphong->setInt("g_normal",1);
+        blinnphong->setInt("g_albedo",2);
+        blinnphong->setInt("g_material",3);
+
+
+        for(int i = 0; i < light_instances.size(); i++)
+        {
+            auto sphereMatrix = glm::translate(glm::mat4(1.0f), light_instances[i].position);
+            blinnphong->setMat4("model", sphereMatrix);
+            blinnphong->setVec3("light.pos",light_instances[i].position);
+            blinnphong->setVec3("light.color",light_instances[i].color);
+
+            sphere.draw();
+        }
+
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    { // render fullscreen quad
+
+        noprocess->use();
+        noprocess->setInt("screen",0);
+         
+        glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+
+        glClearColor(0.0f,0.0f,0.0f,0.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glBindVertexArray(fullscreen_quad.vao);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, framebuffer.position);
+        glDrawArrays(GL_TRIANGLES,0,6);
     }
 
-    
+    { // render light sources
+        //glClearColor(0.0f,0.0f,0.0f,0.0f);
+        //glClear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT);
 
-    glDisable(GL_DEPTH_TEST);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer.fbo);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+        glBlitFramebuffer(0,0,kFramebufferWidth,kFramebufferHeight,0,0,kFramebufferWidth,kFramebufferHeight,GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT,GL_NEAREST);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        lightsphere->use();
+        lightsphere->setMat4("view_proj", view_proj);
 
-    glBindVertexArray(fullscreen_quad.vao);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, fbo_texture);
-    glDrawArrays(GL_TRIANGLES,0,6);
+        glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        //render all lights, similar loop
+        for(int i = 0; i < light_instances.size(); i++)
+        {
+            auto sphereMatrix = glm::translate(glm::mat4(1.0f), light_instances[i].position);
+            lightsphere->setMat4("model", sphereMatrix);
+            lightsphere->setVec3("color",light_instances[i].color);
+
+            sphere.draw(ew::DrawMode::LINES);
+        }
+
+    }
 }
 
 void Scene::Debug(void)
 {
-    ImGuizmo::BeginFrame();
-    ImGuizmo::SetDrawlist(ImGui::GetBackgroundDrawList());
-    ImGuizmo::SetRect(0, 0, ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
-
-    glm::mat4 m{1.0f};
-    auto *view = glm::value_ptr(camera.View());
-    auto *proj = glm::value_ptr(camera.Projection());
-    
-    ImGuizmo::DrawGrid(view, proj, glm::value_ptr(m), 100.0f);
-
-    auto light_matrix = glm::translate(glm::mat4(1.0f),light.position);
-    ImGuizmo::Manipulate(
-        view,
-        proj,
-        ImGuizmo::TRANSLATE,
-        ImGuizmo::WORLD,
-        glm::value_ptr(light_matrix)
-    );
-
-    if(ImGuizmo::IsUsing())
-    {
-        light.position = glm::vec3(light_matrix[3]);
-    }
-
     cameracontroller.Debug();
 
     ImGui::Begin("Controlls", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
     ImGui::Checkbox("Paused", &time.paused);
     ImGui::SliderFloat("Time Factor", &time.factor, 0.0f, 10.0f);
-    /*ImGui::ColorEdit3("Light Color", &light.color[0]);
-    ImGui::DragFloat("Ambient", &debug.ambient, 0.01f, 0.0f,1.0f);
-    ImGui::DragFloat("Diffuse", &debug.diffuse, 0.01f, 0.0f,1.0f);
-    ImGui::DragFloat("Specular", &debug.specular, 0.01f, 0.0f,1.0f);
-    ImGui::DragFloat("Shiny", &debug.alpha, 1.0f, 1.0f,128.0f);*/
-    ImGui::SeparatorText("Palette");
-    ImGui::ColorEdit3("Color1",&palette.color1[0]);
-    ImGui::ColorEdit3("Color2",&palette.color2[0]);
-    if (ImGui::SliderInt("size", &debug.width, 0, 30)){
-        CacheInstanceData();
-    }
-    ImGui::SliderInt("spacing", &debug.spacing, 0, 100);
-    switch (selectedMenu)
+
+    if (ImGui::SliderInt("Width", &debug.width, 1, 100))
     {
-    case 0:
-        ImGui::SliderFloat("Kernal Blur", &debug.slot1, 10.0f, 300.0f);
-        break;
-    case 1:
-        
-        break;
-    case 2:
-        ImGui::SliderFloat("intensity", &debug.slot1, 10.0, 60.0f);
-        ImGui::SliderFloat("extent", &debug.slot2, 0.1f, 0.8f);
-        break;
-    case 3:
-        ImGui::SliderFloat("strength", &debug.slot3, 0.0f, 1.0f);
-        break;
-    case 4:
-        ImGui::SliderFloat("red offset", &debug.slotV3.x, -0.02f, 0.02f);
-        ImGui::SliderFloat("green offset", &debug.slotV3.y, -0.02f, 0.02f);
-        ImGui::SliderFloat("blue offset", &debug.slotV3.z, -0.02f, 0.02f);
-        break;
-    case 5:
-        ImGui::SliderFloat("strength", &debug.slot3, 0.0f, 1.0f);
-        break;
-    default:
-        break;
+        InitializeInstanceData();
     }
-    ImGui::Combo("Current Shader", &selectedMenu, shaderMenu, IM_ARRAYSIZE(shaderMenu));
 
-    ImGui::Image(
-        (void*)(intptr_t) fbo_texture,
-        ImVec2(400,300),
-        ImVec2(0,1), ImVec2(1,0)
-    );
+    if (ImGui::CollapsingHeader("Lights"))
+    {
+        ImGui::Checkbox("Draw Volumes", &debug.draw_light_volume);
+        ImGui::SliderFloat("Light Radisu", &debug.light_radius, 1.0f, 100.0f);
+    }
 
-    ImGui::Image(
-        (void*)(intptr_t) fbo_depth,
-        ImVec2(400,300),
-        ImVec2(0,1), ImVec2(1,0)
-    );
+    if (ImGui::CollapsingHeader("Material"))
+    {
+        ImGui::SliderFloat("Ambient", &material.ambient, 0.0f, 1.0f);
+        ImGui::SliderFloat("Diffuse", &material.diffuse, 0.0f, 1.0f);
+        ImGui::SliderFloat("Specular", &material.specular, 0.0f, 1.0f);
+        ImGui::SliderFloat("Shininess", &material.shininess, 0.0f, 1.0f);
+    }
 
-    /* build debug ui here */
+    if (ImGui::CollapsingHeader("Geometry Buffer"))
+    {
+        ImVec2 uv_min(0.0f, 1.0f);
+        ImVec2 uv_max(1.0f, 0.0f);
 
+        ImGui::Text("Lighting:");
+        ImGui::Image((ImTextureID)(intptr_t)lightvolumebuffer.color, ImVec2(200, 150), uv_min, uv_max);
+
+        ImGui::Text("Albedo:");
+        ImGui::Image((ImTextureID)(intptr_t)framebuffer.albedo, ImVec2(200, 150), uv_min, uv_max);
+
+        ImGui::Text("Material:");
+        ImGui::Image((ImTextureID)(intptr_t)framebuffer.material, ImVec2(200, 150), uv_min, uv_max);
+
+        ImGui::Text("Position:");
+        ImGui::Image((ImTextureID)(intptr_t)framebuffer.position, ImVec2(200, 150), uv_min, uv_max);
+
+        ImGui::Text("Normal:");
+        ImGui::Image((ImTextureID)(intptr_t)framebuffer.normal, ImVec2(200, 150), uv_min, uv_max);
+
+        ImGui::Text("Depth:");
+        ImGui::Image((ImTextureID)(intptr_t)framebuffer.depth, ImVec2(200, 150), uv_min, uv_max);
+    }
     ImGui::End();
 }

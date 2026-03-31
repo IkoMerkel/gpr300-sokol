@@ -1,13 +1,16 @@
 #pragma once
 
 // batteries
+#include "batteries/lights.h"
 #include "batteries/scene.h"
 
 // ew
 #include "ew/model.h"
 #include "ew/shader.h"
 #include "ew/texture.h"
-#include "batteries/lights.h"
+
+// std
+#include <vector>
 
 class Scene final : public batteries::Scene
 {
@@ -20,28 +23,20 @@ class Scene final : public batteries::Scene
     void Debug(void);
 
   private:
+    void InitializeInstanceData(void);
+
+  private:
     std::unique_ptr<ew::Model> suzanne;
-    std::unique_ptr<ew::Shader> toon;
+    std::unique_ptr<ew::Shader> geometry;
+    std::unique_ptr<ew::Shader> blinnphong;
+    std::unique_ptr<ew::Shader> noprocess;
+    std::unique_ptr<ew::Shader> lightsphere;
     std::unique_ptr<ew::Texture> texture;
-    std::unique_ptr<ew::Texture> texturePlad;
 
-    std::unique_ptr<ew::Shader> postProcess;
-
+    batteries::ambient_t ambient;
     batteries::light_t light;
+    ew::Mesh sphere;
 
-    void CacheInstanceData();
-
-    struct 
-    {
-      glm::vec3 color1;
-      glm::vec3 color2;
-    }palette;
-    
-    std::vector<glm::mat4> modelInstance;
-
-    unsigned int fbo;
-    unsigned int fbo_texture;
-    unsigned int fbo_depth;
-
-    unsigned int instnace_buffer;
+    std::vector<glm::mat4> model_instances;
+    std::vector<batteries::light_t> light_instances;
 };
