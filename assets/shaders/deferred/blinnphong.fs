@@ -14,8 +14,9 @@ uniform vec3 camera;
 uniform Light light;
 
 out vec4 FragLighting;
+in vec2 vs_texcoord;
 
 void main()
-{
-    FragLighting = vec4(light.color,1.0);
+{ 
+  FragLighting = vec4(light.color,1.0);
 }

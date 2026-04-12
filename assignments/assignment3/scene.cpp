@@ -249,11 +249,12 @@ void Scene::Render(void)
 
         geometry->use();
         geometry->setMat4("view_proj", view_proj);
-        geometry->setMat4("material.ambient", material.ambient);
-        geometry->setMat4("material.diffuse", material.diffuse);
-        geometry->setMat4("material.specular", material.specular);
-        geometry->setMat4("material.shininess", material.shininess);
+        geometry->setFloat("material.ambient", material.ambient);
+        geometry->setFloat("material.diffuse", material.diffuse);
+        geometry->setFloat("material.specular", material.specular);
+        geometry->setFloat("material.shininess", material.shininess);
 
+        
         auto i = 0;
         for (auto x = -debug.width; x <= debug.width; x++)
         {
@@ -289,6 +290,7 @@ void Scene::Render(void)
         glBindTexture(GL_TEXTURE_2D, framebuffer.albedo);
         glActiveTexture(GL_TEXTURE3);
         glBindTexture(GL_TEXTURE_2D, framebuffer.material);
+
 
         blinnphong->use();
 
