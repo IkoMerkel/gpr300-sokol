@@ -159,7 +159,7 @@ struct LighVolumebuffer
 
 struct Material
 {
-    float ambient = 1.0f;
+    float ambient = 0.0f;
     float diffuse = 0.5f;
     float specular = 0.5f;
     float shininess = 0.5f;
@@ -170,6 +170,7 @@ struct
     int width = 2;
     float light_radius = 2.5f;
     bool draw_light_volume = false;
+    float light_attenuation = 1.0f;
 } debug;
 
 Scene::Scene()
@@ -277,7 +278,10 @@ void Scene::Render(void)
         glBlendEquation(GL_FUNC_ADD);
         glDisable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
-        glCullFace(GL_BACK);
+        glCullFace(GL_FRONT);
+        //glDepthMask(GL_TRUE);
+        glDepthFunc(GL_LEQUAL);
+        
 
         glClearColor(0.0f,0.0f,0.0f,0.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -306,12 +310,13 @@ void Scene::Render(void)
 
         for(int i = 0; i < light_instances.size(); i++)
         {
-            const auto scale = glm::scale(glm::mat4(1.0f),glm::vec3(debug.light_radius * 0.5));
+            const auto scale = glm::scale(glm::mat4(1.0f),glm::vec3(debug.light_radius));
             auto sphereMatrix = glm::translate(glm::mat4(1.0f), light_instances[i].position) * scale;
             blinnphong->setMat4("model", sphereMatrix);
             blinnphong->setVec3("light.pos",light_instances[i].position);
             blinnphong->setFloat("light.radius",debug.light_radius);
             blinnphong->setVec3("light.color",light_instances[i].color);
+            blinnphong->setFloat("light.attenuation",debug.light_attenuation);
 
             sphere.draw();
         }
@@ -325,12 +330,12 @@ void Scene::Render(void)
         noprocess->setInt("blinnPhong",2);
          
         glDisable(GL_BLEND);
-        glEnable(GL_DEPTH_TEST);
+        glDisable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
 
         glClearColor(0.0f,0.0f,0.0f,0.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT);
 
         glBindVertexArray(fullscreen_quad.vao);
         glActiveTexture(GL_TEXTURE1);
@@ -388,6 +393,7 @@ void Scene::Debug(void)
     {
         ImGui::Checkbox("Draw Volumes", &debug.draw_light_volume);
         ImGui::SliderFloat("Light Radisu", &debug.light_radius, 1.0f, 100.0f);
+        ImGui::SliderFloat("Light Attenuation", &debug.light_attenuation, 0.1f, 1.0f);
     }
 
     if (ImGui::CollapsingHeader("Material"))

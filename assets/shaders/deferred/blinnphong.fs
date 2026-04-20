@@ -9,6 +9,7 @@ struct Light{
   vec3 pos;
   vec3 color;
   float radius;
+  float attenuation;
 };
 
 uniform vec3 camera;
@@ -20,12 +21,15 @@ in vec3 vs_normal;
 
 float attenuateLinear(float distance, float radius)
 {
+  //return clamp((radius-distance)/radius,0.0,1.0);
+
   float i = clamp(1.0 - pow(distance/radius,4.0),0.0,1.0);
   return i*i;
 }
 
 vec3 blinnphong(vec3 normal, vec3 frag_position, vec3 light_position, vec4 material) {
   vec3 view_dir = normalize(camera - frag_position);
+  vec3 diff = light_position - frag_position;
   vec3 light_dir = normalize(light_position - frag_position);
   vec3 reflect_dir = reflect(light_dir, normal);
   vec3 half_dir = normalize(light_dir + view_dir); 
@@ -35,8 +39,8 @@ vec3 blinnphong(vec3 normal, vec3 frag_position, vec3 light_position, vec4 mater
 
   vec3 diffuse = NdotL * vec3(material.g);
   vec3 specular = pow(NdotH, material.a * 128) * vec3(material.b);
-  vec3 lighting = diffuse + specular;
-  return (lighting * (light.color * attenuateLinear(length(light_dir),light.radius)));
+  vec3 lighting = diffuse + specular + vec3(material.r);
+  return (lighting * (light.color * attenuateLinear(length(diff),light.radius)));
   //vec3(material.r);
 }
 
